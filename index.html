@@ -217,7 +217,12 @@
     drawText('You vs Computer', W / 2, H / 2 - 10, 22, '#aaa');
     drawText('First to 21 wins', W / 2, H / 2 + 30, 18, '#888');
     drawText('↑ ↓  Arrow Keys to move', W / 2, H / 2 + 75, 16, '#666');
-    drawText('Press any key to start', W / 2, H / 2 + 130, 20, '#fff');
+    drawText('Press any key to start', W / 2, H / 2 + 120, 20, '#fff');
+    // Pulse opacity for start prompt
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+    ctx.globalAlpha = pulse;
+    drawText('▶', W / 2, H / 2 + 155, 18, '#666');
+    ctx.globalAlpha = 1;
   }
 
   function drawGame() {
