@@ -102,17 +102,23 @@
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
+  function handleStart() {
+    if (state === 'start' || state === 'over') {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    }
+  }
+
   document.addEventListener('keydown', e => {
     keys[e.key] = true;
-    if (state === 'start' || state === 'over') {
-      // Resume audio context on first interaction (browser policy)
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      if (state === 'start') initGame();
-      else if (state === 'over') initGame();
-    }
+    handleStart();
     if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   });
   document.addEventListener('keyup', e => { keys[e.key] = false; });
+  canvas.addEventListener('click', handleStart);
+  // Ensure canvas can receive focus in iframes/embeds
+  canvas.setAttribute('tabindex', '0');
+  canvas.focus();
 
   // ── Collision ─────────────────────────────────────────────────────────────
   function rectsOverlap(a, b) {
@@ -217,7 +223,12 @@
     drawText('You vs Computer', W / 2, H / 2 - 10, 22, '#aaa');
     drawText('First to 21 wins', W / 2, H / 2 + 30, 18, '#888');
     drawText('↑ ↓  Arrow Keys to move', W / 2, H / 2 + 75, 16, '#666');
-    drawText('Press any key to start', W / 2, H / 2 + 130, 20, '#fff');
+    drawText('Press any key or click to start', W / 2, H / 2 + 120, 20, '#fff');
+    // Pulse opacity for start prompt
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+    ctx.globalAlpha = pulse;
+    drawText('▶', W / 2, H / 2 + 155, 18, '#666');
+    ctx.globalAlpha = 1;
   }
 
   function drawGame() {
@@ -254,7 +265,7 @@
     drawText(headline, W / 2, H / 2 - 70, 58, color);
     drawText(sub, W / 2, H / 2 - 10, 22, '#aaa');
     drawText(`${scores.player} — ${scores.ai}`, W / 2, H / 2 + 45, 36);
-    drawText('Press any key to play again', W / 2, H / 2 + 110, 18, '#888');
+    drawText('Press any key or click to play again', W / 2, H / 2 + 110, 18, '#888');
   }
 
   // ── Game loop ──────────────────────────────────────────────────────────────
