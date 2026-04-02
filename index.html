@@ -76,9 +76,10 @@
   // 'start' | 'playing' | 'over'
   let state = 'start';
 
-  let player, ai, ball, scores, keys, winner;
+  let player, ai, ball, scores, keys, winner, gameOverAt;
+  let countdownStartedAt, countdownServeTo;
 
-  function resetBall(serveTo = 'player') {
+  function launchBall(serveTo = 'player') {
     const angle = (Math.random() * 60 - 30) * (Math.PI / 180);
     const dirX = serveTo === 'player' ? -1 : 1;
     ball = {
@@ -91,26 +92,35 @@
     };
   }
 
+  function startCountdown(serveTo = 'player') {
+    // Park ball at center with no velocity
+    ball = { x: W / 2, y: H / 2, vx: 0, vy: 0, w: BALL_SIZE, h: BALL_SIZE };
+    countdownServeTo = serveTo;
+    countdownStartedAt = Date.now();
+    state = 'countdown';
+  }
+
   function initGame() {
     player = { x: 20, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H, dy: 0 };
     ai     = { x: W - 20 - PADDLE_W, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H };
     scores = { player: 0, ai: 0 };
     keys   = {};
     winner = null;
-    resetBall('player');
-    state = 'playing';
+    startCountdown('player');
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
   function handleStart() {
-    if (state === 'start' || state === 'over') {
+    if (state === 'start') {
       if (audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    } else if (state === 'over' && Date.now() - gameOverAt > 1000) {
       initGame();
     }
   }
 
   document.addEventListener('keydown', e => {
-    keys[e.key] = true;
+    if (state === 'playing' || state === 'countdown') keys[e.key] = true;
     handleStart();
     if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   });
@@ -182,13 +192,13 @@
     if (ball.x + ball.w < 0) {
       scores.ai++;
       sound.score();
-      if (scores.ai >= WIN_SCORE) { winner = 'ai'; state = 'over'; return; }
-      resetBall('player');
+      if (scores.ai >= WIN_SCORE) { winner = 'ai'; state = 'over'; gameOverAt = Date.now(); return; }
+      startCountdown('player');
     } else if (ball.x > W) {
       scores.player++;
       sound.score();
-      if (scores.player >= WIN_SCORE) { winner = 'player'; state = 'over'; return; }
-      resetBall('ai');
+      if (scores.player >= WIN_SCORE) { winner = 'player'; state = 'over'; gameOverAt = Date.now(); return; }
+      startCountdown('ai');
     }
   }
 
@@ -258,14 +268,19 @@
     ctx.clearRect(0, 0, W, H);
 
     const won = winner === 'player';
-    const headline = won ? 'YOU WIN!' : 'GAME OVER';
-    const sub      = won ? 'Congratulations!' : 'Better luck next time.';
+    const headline = won ? 'You won!' : 'Maybe next time';
     const color    = won ? '#4f4' : '#f44';
 
-    drawText(headline, W / 2, H / 2 - 70, 58, color);
-    drawText(sub, W / 2, H / 2 - 10, 22, '#aaa');
-    drawText(`${scores.player} — ${scores.ai}`, W / 2, H / 2 + 45, 36);
-    drawText('Press any key or click to play again', W / 2, H / 2 + 110, 18, '#888');
+    drawText(headline, W / 2, H / 2 - 60, 58, color);
+    drawText(`${scores.player} — ${scores.ai}`, W / 2, H / 2 + 10, 36);
+
+    // Show "click to play again" after a brief delay so it doesn't flash
+    if (Date.now() - gameOverAt > 1000) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+      ctx.globalAlpha = pulse;
+      drawText('Click anywhere to play again', W / 2, H / 2 + 80, 18, '#888');
+      ctx.globalAlpha = 1;
+    }
   }
 
   // ── Game loop ──────────────────────────────────────────────────────────────
@@ -274,6 +289,27 @@
       case 'start':
         drawStartScreen();
         break;
+      case 'countdown': {
+        // Allow paddle movement during countdown
+        if (keys['ArrowUp'])   player.y -= PLAYER_SPEED;
+        if (keys['ArrowDown']) player.y += PLAYER_SPEED;
+        player.y = clamp(player.y, 0, H - PADDLE_H);
+
+        const elapsed = Date.now() - countdownStartedAt;
+        const count = 3 - Math.floor(elapsed / 500);
+
+        if (count <= 0) {
+          launchBall(countdownServeTo);
+          state = 'playing';
+        }
+
+        drawGame();
+        // Draw countdown number on top of game
+        if (count > 0) {
+          drawText(count, W / 2, H / 2, 80, '#fff');
+        }
+        break;
+      }
       case 'playing':
         update();
         drawGame();
